@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  phone               String   @unique
+  email               String?  @unique
+  passwordHash        String?  @map("password_hash")
+  fullName            String   @map("full_name")
+  profilePicture      String?  @map("profile_picture")
+  dateOfBirth         DateTime? @map("date_of_birth")
+  gender              String?
+  city                String?
+  isVerified          Boolean  @default(false) @map("is_verified")
+  verificationDocument String? @map("verification_document")
+  role                String   @default("player")
+  walletBalance       Decimal  @default(0.00) @map("wallet_balance") @db.Decimal(10, 2)
+  xpPoints            Int      @default(0) @map("xp_points")
+  level               Int      @default(1)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  userSports          UserSport[]
+  ownedTurfs          Turf[]
+  bookings            Booking[]
+  hostedMatches       Match[]
+  matchParticipants   MatchParticipant[]
+  transactions        Transaction[]
+  reviews             Review[]
+  leaderboards        Leaderboard[]
+  notifications       Notification[]
+  supportTickets      SupportTicket[]
+  refreshTokens       RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Sport {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  iconUrl  String? @map("icon_url")
+  isActive Boolean @default(true) @map("is_active")
+
+  userSports    UserSport[]
+  turfSports    TurfSport[]
+  turfSlots     TurfSlot[]
+  matches       Match[]
+  leaderboards  Leaderboard[]
+
+  @@map("sports")
+}
+
+model UserSport {
+  id                Int     @id @default(autoincrement())
+  userId            String  @map("user_id")
+  sportId           Int     @map("sport_id")
+  skillLevel        String? @map("skill_level")
+  preferredPosition String? @map("preferred_position")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sport Sport @relation(fields: [sportId], references: [id])
+
+  @@unique([userId, sportId])
+  @@map("user_sports")
+}
+
+model Turf {
+  id           String   @id @default(uuid())
+  ownerId      String   @map("owner_id")
+  name         String
+  description  String?
+  address      String
+  city         String
+  latitude     Decimal? @db.Decimal(10, 8)
+  longitude    Decimal? @db.Decimal(11, 8)
+  contactPhone String?  @map("contact_phone")
+  contactEmail String?  @map("contact_email")
+  amenities    String[]
+  images       String[]
+  isVerified   Boolean  @default(false) @map("is_verified")
+  isActive     Boolean  @default(true) @map("is_active")
+  rating       Decimal  @default(0.00) @db.Decimal(3, 2)
+  totalReviews Int      @default(0) @map("total_reviews")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  owner      User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  turfSports TurfSport[]
+  turfSlots  TurfSlot[]
+  bookings   Booking[]
+  matches    Match[]
+  reviews    Review[]
+
+  @@map("turfs")
+}
+
+model TurfSport {
+  id         Int    @id @default(autoincrement())
+  turfId     String @map("turf_id")
+  sportId    Int    @map("sport_id")
+  maxPlayers Int?   @map("max_players")
+
+  turf  Turf  @relation(fields: [turfId], references: [id], onDelete: Cascade)
+  sport Sport @relation(fields: [sportId], references: [id])
+
+  @@unique([turfId, sportId])
+  @@map("turf_sports")
+}
+
+model TurfSlot {
+  id           String   @id @default(uuid())
+  turfId       String   @map("turf_id")
+  sportId      Int      @map("sport_id")
+  slotDate     DateTime @map("slot_date") @db.Date
+  startTime    DateTime @map("start_time") @db.Time
+  endTime      DateTime @map("end_time") @db.Time
+  basePrice    Decimal  @map("base_price") @db.Decimal(10, 2)
+  dynamicPrice Decimal? @map("dynamic_price") @db.Decimal(10, 2)
+  isAvailable  Boolean  @default(true) @map("is_available")
+  isBlocked    Boolean  @default(false) @map("is_blocked")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  turf     Turf      @relation(fields: [turfId], references: [id], onDelete: Cascade)
+  sport    Sport     @relation(fields: [sportId], references: [id])
+  bookings Booking[]
+  matches  Match[]
+
+  @@unique([turfId, sportId, slotDate, startTime])
+  @@map("turf_slots")
+}
+
+model Booking {
+  id                 String    @id @default(uuid())
+  slotId             String    @map("slot_id")
+  turfId             String    @map("turf_id")
+  bookerId           String    @map("booker_id")
+  bookingType        String    @map("booking_type")
+  totalPrice         Decimal   @map("total_price") @db.Decimal(10, 2)
+  paymentStatus      String    @default("pending") @map("payment_status")
+  bookingStatus      String    @default("confirmed") @map("booking_status")
+  paymentMethod      String?   @map("payment_method")
+  transactionId      String?   @map("transaction_id")
+  cancellationReason String?   @map("cancellation_reason")
+  cancelledAt        DateTime? @map("cancelled_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  slot    TurfSlot @relation(fields: [slotId], references: [id])
+  turf    Turf     @relation(fields: [turfId], references: [id])
+  booker  User     @relation(fields: [bookerId], references: [id])
+  matches Match[]
+  reviews Review[]
+
+  @@map("bookings")
+}
+
+model Match {
+  id                  String   @id @default(uuid())
+  bookingId           String   @map("booking_id")
+  hostId              String   @map("host_id")
+  sportId             Int      @map("sport_id")
+  turfId              String   @map("turf_id")
+  slotId              String   @map("slot_id")
+  matchDate           DateTime @map("match_date") @db.Date
+  startTime           DateTime @map("start_time") @db.Time
+  endTime             DateTime @map("end_time") @db.Time
+  totalSlots          Int      @map("total_slots")
+  filledSlots         Int      @default(1) @map("filled_slots")
+  pricePerPlayer      Decimal  @map("price_per_player") @db.Decimal(10, 2)
+  skillLevelRequired  String?  @map("skill_level_required")
+  matchStatus         String   @default("open") @map("match_status")
+  matchType           String?  @map("match_type")
+  description         String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  booking      Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  host         User               @relation(fields: [hostId], references: [id])
+  sport        Sport              @relation(fields: [sportId], references: [id])
+  turf         Turf               @relation(fields: [turfId], references: [id])
+  slot         TurfSlot           @relation(fields: [slotId], references: [id])
+  participants MatchParticipant[]
+
+  @@map("matches")
+}
+
+model MatchParticipant {
+  id               Int       @id @default(autoincrement())
+  matchId          String    @map("match_id")
+  userId           String    @map("user_id")
+  joinedAt         DateTime  @default(now()) @map("joined_at")
+  paymentStatus    String    @default("pending") @map("payment_status")
+  attendanceStatus String?   @map("attendance_status")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([matchId, userId])
+  @@map("match_participants")
+}
+
+model Transaction {
+  id                   String   @id @default(uuid())
+  userId               String   @map("user_id")
+  transactionType      String   @map("transaction_type")
+  amount               Decimal  @db.Decimal(10, 2)
+  purpose              String
+  referenceId          String?  @map("reference_id")
+  paymentGateway       String?  @map("payment_gateway")
+  gatewayTransactionId String?  @map("gateway_transaction_id")
+  status               String   @default("pending")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("transactions")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  turfId    String   @map("turf_id")
+  userId    String   @map("user_id")
+  bookingId String   @map("booking_id")
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  turf    Turf    @relation(fields: [turfId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@unique([bookingId, userId])
+  @@map("reviews")
+}
+
+model Leaderboard {
+  id            Int      @id @default(autoincrement())
+  userId        String   @map("user_id")
+  sportId       Int      @map("sport_id")
+  city          String
+  xpPoints      Int      @default(0) @map("xp_points")
+  matchesPlayed Int      @default(0) @map("matches_played")
+  matchesWon    Int      @default(0) @map("matches_won")
+  rank          Int?
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sport Sport @relation(fields: [sportId], references: [id])
+
+  @@unique([userId, sportId, city])
+  @@map("leaderboards")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  title       String
+  message     String
+  type        String
+  referenceId String?  @map("reference_id")
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  subject     String
+  description String
+  status      String   @default("open")
+  priority    String   @default("medium")
+  assignedTo  String?  @map("assigned_to")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("support_tickets")
+}
